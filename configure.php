@@ -76,21 +76,28 @@ function replaceForAllOtherOSes(): array {
     return explode(PHP_EOL, run('grep -E -r -l -i ":author|:vendor|:package|VendorName|skeleton|vendor_name|vendor_slug|author@domain.com" --exclude-dir=vendor ./* ./.github/* | grep -v ' . basename(__FILE__)));
 }
 
-$gitName = run('git config user.name');
-$authorName = ask('Author name', $gitName);
-
-$gitEmail = run('git config user.email');
-$authorEmail = ask('Author email', $gitEmail);
-
-$usernameGuess = explode(':', run('git config remote.origin.url'))[1];
-$usernameGuess = dirname($usernameGuess);
-$usernameGuess = basename($usernameGuess);
-$authorUsername = ask('Author username', $usernameGuess);
-
-$vendorName = ask('Vendor name', $authorUsername);
+$authorName = $gitName = 'Matija Kovačević';
+$authorUsername = 'matijakovacevic';
+$authorEmail = 'matija@matastic.co';
+$vendorName = 'matastic';
 $vendorSlug = slugify($vendorName);
 $vendorNamespace = ucwords($vendorName);
-$vendorNamespace = ask('Vendor namespace', $vendorNamespace);
+
+// $gitName = run('git config user.name');
+// $authorName = ask('Author name', $gitName); // NOTE: throws "Segmentation fault" error on non-US characters
+//
+// $gitEmail = run('git config user.email');
+// $authorEmail = ask('Author email', $gitEmail);
+//
+// $usernameGuess = explode(':', run('git config remote.origin.url'))[1];
+// $usernameGuess = dirname($usernameGuess);
+// $usernameGuess = basename($usernameGuess);
+// $authorUsername = ask('Author username', $usernameGuess);
+//
+// $vendorName = ask('Vendor name', $authorUsername);
+// $vendorSlug = slugify($vendorName);
+// $vendorNamespace = ucwords($vendorName);
+// $vendorNamespace = ask('Vendor namespace', $vendorNamespace);
 
 $currentDirectory = getcwd();
 $folderName = basename($currentDirectory);
@@ -103,18 +110,35 @@ $className = title_case($packageName);
 $className = ask('Class name', $className);
 $description = ask('Package description', "This is my package {$packageSlug}");
 
+$externalDocsUrl = ask('Documentation url (leave empty if no external docs)');
+
 writeln('------');
 writeln("Author     : {$authorName} ({$authorUsername}, {$authorEmail})");
 writeln("Vendor     : {$vendorName} ({$vendorSlug})");
 writeln("Package    : {$packageSlug} <{$description}>");
 writeln("Namespace  : {$vendorNamespace}\\{$className}");
 writeln("Class name : {$className}");
+if ($externalDocsUrl) {
+    $externalDocsUrl = preg_replace('/^https{0,1}:\/\//', '', $externalDocsUrl);
+    $externalDocsUrl = 'https://' . $externalDocsUrl;
+
+    writeln("External docs url : {$externalDocsUrl}");
+}
 writeln('------');
 
 writeln('This script will replace the above values in all relevant files in the project directory.');
 
 if (! confirm('Modify files?', true)) {
     exit(1);
+}
+
+// if docs are from external url,  make external readme the default one
+if ($externalDocsUrl) {
+    unlink(__DIR__ . '/README.md');
+    run('mv README-external.md README.md');
+}
+else {
+    unlink(__DIR__ . '/README-external.md');
 }
 
 $files = (str_starts_with(strtoupper(PHP_OS), 'WIN') ? replaceForWindows() : replaceForAllOtherOSes());
@@ -132,6 +156,7 @@ foreach ($files as $file) {
         'Skeleton' => $className,
         'skeleton' => $packageSlug,
         ':package_description' => $description,
+        ':external_docs_url' => $externalDocsUrl,
     ]);
 
     match (true) {
